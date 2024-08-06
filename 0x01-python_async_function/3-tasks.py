@@ -4,7 +4,9 @@ This module provides a function to create an asyncio Task for a coroutine.
 """
 
 import asyncio
-from 0-basic_async_syntax import wait_random
+import importlib
+
+wait_random = importlib.import_module('0-basic_async_syntax').wait_random
 
 def task_wait_random(max_delay: int) -> asyncio.Task:
     """

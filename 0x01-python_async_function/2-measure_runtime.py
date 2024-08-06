@@ -5,7 +5,9 @@ This module provides a function to measure the runtime of an asynchronous corout
 
 import asyncio
 import time
-from 1-concurrent_coroutines import wait_n
+import importlib
+
+wait_n = importlib.import_module('1-concurrent_coroutines').wait_n
 
 def measure_time(n: int, max_delay: int) -> float:
     """
