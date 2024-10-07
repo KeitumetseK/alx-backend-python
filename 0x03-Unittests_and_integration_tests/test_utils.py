@@ -1,81 +1,74 @@
-#!/usr/bin/env python3
-
-"""
-Test suite for the GithubOrgClient class in the client module.
-
-This module contains unit tests for the methods in the GithubOrgClient class,
-including tests for public repositories and repository license filtering.
-"""
-
 import unittest
-from unittest.mock import patch, Mock, PropertyMock
-from parameterized import parameterized_class
-from client import GithubOrgClient
-from fixtures import org_payload, repos_payload, expected_repos, apache2_repos
+from parameterized import parameterized
+from utils import access_nested_map, get_json, memoize
+from unittest.mock import patch, Mock
 
-@parameterized_class(('org_payload', 'repos_payload', 'expected_repos', 'apache2_repos'), [
-    (org_payload, repos_payload, expected_repos, apache2_repos),
-])
-class TestGithubOrgClient(unittest.TestCase):
-    """
-    Unit test class for GithubOrgClient.
 
-    This class tests the functionality of the GithubOrgClient class, including
-    fetching public repositories and filtering by license.
-    """
+# Unit Test for access_nested_map
+class TestAccessNestedMap(unittest.TestCase):
+    """Test class for access_nested_map function"""
 
-    @classmethod
-    def setUpClass(cls) -> None:
-        """
-        Set up the test environment before running the tests.
+    @parameterized.expand([
+        ({"a": 1}, ("a",), 1),
+        ({"a": {"b": 2}}, ("a",), {"b": 2}),
+        ({"a": {"b": 2}}, ("a", "b"), 2)
+    ])
+    def test_access_nested_map(self, nested_map, path, expected):
+        """Test that access_nested_map returns the expected result."""
+        self.assertEqual(access_nested_map(nested_map, path), expected)
 
-        This method patches the `requests.get` function to return mock data
-        based on the URL being queried.
-        """
-        cls.get_patcher = patch('requests.get')
-        mock_get = cls.get_patcher.start()
-        mock_get.side_effect = lambda url: Mock(json=lambda: cls.org_payload if "orgs" in url else cls.repos_payload)
+    @parameterized.expand([
+        ({}, ("a",)),
+        ({"a": 1}, ("a", "b"))
+    ])
+    def test_access_nested_map_exception(self, nested_map, path):
+        """Test that access_nested_map raises KeyError when necessary."""
+        with self.assertRaises(KeyError) as cm:
+            access_nested_map(nested_map, path)
+        self.assertEqual(str(cm.exception), f"'{path[-1]}'")
 
-    @classmethod
-    def tearDownClass(cls) -> None:
-        """
-        Tear down the test environment after running the tests.
 
-        This method stops the patching of `requests.get`.
-        """
-        cls.get_patcher.stop()
+# Unit Test for get_json
+class TestGetJson(unittest.TestCase):
+    """Test class for get_json function"""
 
-    def test_public_repos(self) -> None:
-        """
-        Test the public_repos method of GithubOrgClient.
+    @parameterized.expand([
+        ("http://example.com", {"payload": True}),
+        ("http://holberton.io", {"payload": False})
+    ])
+    @patch('utils.requests.get')
+    def test_get_json(self, test_url, test_payload, mock_get):
+        """Test that get_json returns the expected result."""
+        mock_response = Mock()
+        mock_response.json.return_value = test_payload
+        mock_get.return_value = mock_response
 
-        This test ensures that the public_repos method returns the expected
-        list of repositories based on the mocked data.
-        """
-        client = GithubOrgClient("test")
-        self.assertEqual(client.public_repos(), self.expected_repos)
+        self.assertEqual(get_json(test_url), test_payload)
+        mock_get.assert_called_once_with(test_url)
 
-    @patch('client.GithubOrgClient._public_repos_url', new_callable=PropertyMock)
-    @patch('client.get_json')
-    def test_public_repos_with_license(self, mock_get_json: Mock, mock_public_repos_url: PropertyMock) -> None:
-        """
-        Test the public_repos method of GithubOrgClient with a license filter.
 
-        This test ensures that the public_repos method, when passed a license
-        filter, returns the expected list of repositories based on the mocked
-        data.
-        
-        Args:
-            mock_get_json (Mock): Mock of the get_json function.
-            mock_public_repos_url (PropertyMock): Mock of the _public_repos_url property.
-        """
-        mock_public_repos_url.return_value = "http://example.com/repos"
-        mock_get_json.return_value = self.apache2_repos
-        
-        client = GithubOrgClient("test")
-        self.assertEqual(client.public_repos(license="apache-2.0"), self.apache2_repos)
-        
-        mock_public_repos_url.assert_called_once()
-        mock_get_json.assert_called_once_with("http://example.com/repos?license=apache-2.0")
+# Unit Test for memoize
+class TestMemoize(unittest.TestCase):
+    """Test class for memoize function"""
 
+    def test_memoize(self):
+        """Test that memoize works as expected."""
+
+        class TestClass:
+            def a_method(self):
+                return 42
+
+            @memoize
+            def a_property(self):
+                return self.a_method()
+
+        with patch.object(TestClass, 'a_method', return_value=42) as mock_method:
+            obj = TestClass()
+            self.assertEqual(obj.a_property, 42)
+            self.assertEqual(obj.a_property, 42)
+            mock_method.assert_called_once()
+
+
+if __name__ == '__main__':
+    unittest.main()
 
